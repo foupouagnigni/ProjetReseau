@@ -14,7 +14,7 @@ public class Client {
 	private String nickname;
 
 	public static void main(String[] args) throws UnknownHostException, IOException {
-		new Client("192.168.43.146", 12345).run();  // initialisation de la connection adresse ip serveur et nport serveur .  
+		new Client("192.168.43.176", 12345).run();  // initialisation de la connection adresse ip serveur et nport serveur .  
 	}
 
 	public Client(String host, int port) {
