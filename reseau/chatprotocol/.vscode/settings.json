@@ -1,0 +1,8 @@
+{
+    "java.project.referencedLibraries": [
+        "lib/**/*.jar",
+        "jar_files/curve25519-java-0.5.0.jar",
+        "jar_files/protobuf-javalite-3.10.0.jar",
+        "jar_files/signal-protocol-java-2.8.1.jar"
+    ]
+}
