@@ -1,74 +1,163 @@
-package sockets;
 
-import java.io.IOException;
+
+import java.io.BufferedReader;
 import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.io.PrintStream;
 import java.net.Socket;
-import java.net.UnknownHostException;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Queue;
 import java.util.Scanner;
+import static java.lang.Integer.parseInt;
 
-public class Client {
+//Clienthandler c est coe ca qu un client est vu du côté du serveur//
 
-	private String host;
-	private int port;
-	private String nickname;
 
-	public static void main(String[] args) throws UnknownHostException, IOException {
-		new Client("192.168.43.146", 12345).run();  // initialisation de la connection adresse ip serveur et nport serveur .  
-	}
 
-	public Client(String host, int port) {
-		this.host = host; // ip serveur
-		this.port = port; // port du serveur 
-	}
+public class Client implements Runnable{
 
-	public void run() throws UnknownHostException, IOException {
-		// connecttion au serveur
-		Socket client = new Socket(host, port);
-		System.out.println("connection etablie avec le serveur avec succes");
+    private int deviceId;
+    private String name;
 
-		// ce code démarrera un thread qui va écouter en permanence
-		// les messages en entrée reçus depuis le client via le flux d'entrée
-		// (input stream) et gérer ces messages en conséquence au fur et à mesure 
-		//qu'ils sont reçus.
-		// Cela permettra donc de recevoir des données du client en parallèle avec 
-		//l'envoi de données vers le client (géré précédemment avec l'initialisation 
-		//du flux d'impression).
-		new Thread(new ReceivedMessagesHandler(client.getInputStream())).start();
+    private Service server;
+    private Socket socket;
 
-		// entrer votre nom 
-		Scanner sc = new Scanner(System.in);
-		System.out.print("Enter votre nom: ");
-		nickname = sc.nextLine();
+    
+    public Client(Service server, Socket socket) {
+        this.server = server;
+        this.socket = socket;
+    }
 
-		// on lis les messages entrees au clavier et on les envois directement au serveur . 
-		System.out.println("Send messages: ");
-		PrintStream output = new PrintStream(client.getOutputStream());
-		while (sc.hasNextLine()) {
-			output.println(nickname + ": " + sc.nextLine());
-		}
-		
-		output.close();
-		sc.close();
-		client.close();
-	}
-}
+    public void setDeviceId(int deviceId) {
+        this.deviceId = deviceId;
+    }
 
-class ReceivedMessagesHandler implements Runnable {
+    public void setName(String name) {
+        this.name = name;
+    }
 
-	private InputStream server;
+    public int getDeviceId() {
+        return deviceId;
+    }
 
-	public ReceivedMessagesHandler(InputStream server) {
-		this.server = server;
-	}
+    public String getName() {
+        return name;
+    }
 
-	@Override
-	public void run() {
-		// on recoit les messages du serveur et on les affiches au fur et a mesure . 
-		Scanner s = new Scanner(server);
-		while (s.hasNextLine()) {
-			System.out.println(s.nextLine());
-		}
-		s.close();
-	}
+    public Socket getSocket() {
+        return socket;
+    }
+
+
+    @Override
+    public void run() {
+        try {
+           
+             
+            InputStream input = socket.getInputStream();
+            PrintStream output = new PrintStream(socket.getOutputStream());
+    
+            BufferedReader reader = new BufferedReader(new InputStreamReader(input));
+            ObjectOutputStream objectOutput=new ObjectOutputStream(socket.getOutputStream());
+            ObjectInputStream  objectInput=new ObjectInputStream(socket.getInputStream());
+          
+        
+            /*
+             * lorsqu on utilise objet printstream output
+             * output.println(data) n ecris pas directement sur la sortie
+             * il faut faire un object.readline(data) , object etant un bufferedreader
+             *  output.println(name) écrit une chaîne de caractères name suivie d'un caractère de retour à la ligne (\n) dans le flux de sortie output.
+             * pour lire name dans ce flux à l entree un readline est necessaire si onutilise un bufferedreader sinon declarer un scanner avec comme entree input
+             * 
+             */
+
+             // Scanner scanner = new Scanner(input); //j ai opté pour un bufferedreader par souci d homogeneité avec le code client
+           
+            output.println("Entez votre identifiant");
+            this.setDeviceId(parseInt(reader.readLine()));
+           
+            output.println("Enter your nickname:");
+            this.setName(reader.readLine());
+           
+        
+            output.println("Welcome ! Your number's client is " + this.getDeviceId());
+
+
+            // Ajouter le client à la liste de client
+            String ipAddress = socket.getInetAddress().getHostAddress();
+            server.addClient(this.getDeviceId(), ipAddress);
+
+            //consigne pour l'envoie de message
+            output.println("Welcome to the chat room, " + deviceId + "!");
+            output.println("To send a private message, type '@deviceId' message");
+            output.println("To send a message to multiple clients, type '#deviceId1,deviceId2 message' ");
+            output.println("To send a message to all others, type directly the 'message' ");
+            output.println("To quit, type 'quit'");
+
+             //-----------------------------TOUT LE HAUT EST CORRECT ET NE POSE PAS DE PROBLEME ----------------------------------------------------------------------------
+
+
+            while (true) {
+                server.afficheClientConnecte();
+
+               
+                String message = reader.readLine();
+
+                if (message.equalsIgnoreCase("quit")) {
+                    break;
+                } 
+
+                
+                    /*
+                     * 
+                     * ECRIRE LE CODE desire ou modifie le.
+                     * 
+                     */
+
+
+                
+                else if (message.startsWith("@")) {
+
+                    String[] parts = message.split(" ", 2);
+                    int recipientDeviceId = parseInt(parts[0].substring(1));
+                    String privateMessage = parts[1];
+                    server.unicastMessage(deviceId, recipientDeviceId, privateMessage);
+
+                } else if (message.startsWith("#")) {
+
+                    String[] parts = message.split(" ", 2);
+                    String[] recipientIds = parts[0].substring(1).split(",");
+                    int[] recipientDeviceId = new int[recipientIds.length];
+                    for (int i = 0; i < recipientDeviceId.length; i++) {
+                        recipientDeviceId[i] = parseInt(recipientIds[i].trim());
+                    }
+
+                    String multicastMessage = parts[1];
+                    server.multicastMessage(deviceId, recipientDeviceId, multicastMessage);
+
+                } else {
+                    server.broadcastMessage(deviceId, message);
+                }
+            }
+
+          //  scanner.close();
+
+            // retire le client de la liste de clients connectés
+            server.removeClient(deviceId);
+            server.deleteClient(this);
+
+            // fermeture de la socket client
+            socket.close();
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+
+    }
+
+    
 }
